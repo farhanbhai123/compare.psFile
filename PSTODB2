@@ -1,0 +1,259 @@
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. CB12J105.
+       ENVIRONMENT DIVISION.
+       INPUT-OUTPUT SECTION.
+       FILE-CONTROL.
+
+           SELECT TI001-INFILE    ASSIGN TO INDD
+           ORGANIZATION                  IS SEQUENTIAL
+           ACCESS MODE                   IS SEQUENTIAL
+           FILE STATUS                   IS WS-FS1.
+
+           SELECT TO001-OUTFILE   ASSIGN TO DD1
+           ORGANIZATION                  IS SEQUENTIAL
+           ACCESS MODE                   IS SEQUENTIAL
+           FILE STATUS                   IS WS-FS2.
+
+           SELECT TO002-OUTFILE   ASSIGN TO DD2
+           ORGANIZATION                  IS SEQUENTIAL
+           ACCESS MODE                   IS SEQUENTIAL
+           FILE STATUS                   IS WS-FS3.
+
+           SELECT TO003-OUTFILE   ASSIGN TO DD3
+           ORGANIZATION                  IS SEQUENTIAL
+           ACCESS MODE                   IS SEQUENTIAL
+           FILE STATUS                   IS WS-FS4.
+
+           SELECT TO004-OUTFILE   ASSIGN TO DD4
+           ORGANIZATION                  IS SEQUENTIAL
+           ACCESS MODE                   IS SEQUENTIAL
+           FILE STATUS                   IS WS-FS5.
+       DATA DIVISION.
+       FILE SECTION.
+       FD TI001-INFILE.
+       01 TI001-INREC.
+          05 ENAME                PIC X(1).
+          05 FILLER               PIC X(79).
+
+       FD TO001-OUTFILE.
+       01 TO001-OUTREC.
+         05 TO001-ENAME1            PIC X(1).
+         05 FILLER                  PIC X(79).
+
+       FD TO002-OUTFILE.
+       01 TO002-OUTREC.
+         05 TO002-ENAME2             PIC X(1).
+         05 FILLER                  PIC X(79).
+
+       FD TO003-OUTFILE.
+       01 TO003-OUTREC.
+         05 TO003-ENAME3             PIC X(1).
+         05 FILLER                  PIC X(79).
+
+       FD TO004-OUTFILE.
+       01 TO004-OUTREC.
+         05 TO004-ENAME4             PIC X(1).
+         05 FILLER                  PIC X(79).
+
+       WORKING-STORAGE SECTION.
+       01 WS-FS1                    PIC 9(2).
+       01 WS-FS2                    PIC 9(2).
+       01 WS-FS3                    PIC 9(2).
+       01 WS-FS4                    PIC 9(2).
+       01 WS-FS5                    PIC 9(2).
+       01 WS-SQLCODE                PIC S9(3) SIGN LEADING SEPARATE.
+       01 WS-EOF                    PIC X(1).
+       01 WS-ID                     PIC X(1).
+       01 WS-I                      PIC 9(2) VALUE 1.
+       01 WS-COUNT                  PIC 9(2) VALUE 0.
+
+       01 WS-ARR1.
+          05 ARR-REC OCCURS 20 TIMES DEPENDING ON WS-I.
+            10 ARR-ID             PIC X(1).
+
+           EXEC SQL
+             INCLUDE SQLCA
+           END-EXEC.
+
+           EXEC SQL
+             INCLUDE DB32J105
+           END-EXEC.
+
+      **********************DECLARATION OF CURSOR***********************
+           EXEC SQL
+            DECLARE CUR1 CURSOR FOR
+             SELECT ENAME FROM EMP3
+           END-EXEC.
+
+       PROCEDURE DIVISION.
+       0000-MAIN-PARA.
+           PERFORM 1000-OPEN-PARA THRU
+                   1000-OPEN-PARA-EXIT.
+           PERFORM 2000-READ-PARA THRU
+                   2000-READ-PARA-EXIT UNTIL WS-FS1=10
+           MOVE 1 TO WS-I.
+           MOVE 'N' TO WS-EOF.
+           PERFORM 3000-FETCH-PARA THRU
+                   3000-FETCH-PARA-EXIT UNTIL WS-EOF = 'Y'
+           PERFORM 4000-CLOSE-PARA THRU
+                   4000-CLOSE-PARA-EXIT.
+           PERFORM 9000-TERM-PARA.
+
+       1000-OPEN-PARA.
+           OPEN INPUT  TI001-INFILE.
+           OPEN OUTPUT TO001-OUTFILE.
+           OPEN OUTPUT TO002-OUTFILE.
+           OPEN OUTPUT TO003-OUTFILE.
+           OPEN OUTPUT TO004-OUTFILE.
+           EVALUATE TRUE
+             WHEN WS-FS1 = 0  AND WS-FS2 = 0 AND WS-FS3 = 0 AND
+                  WS-FS4 = 0 AND WS-FS5 = 0
+               DISPLAY 'OPEN IS SUCCESS FILE       :'
+             WHEN OTHER
+               DISPLAY 'OPEN FAILED FILE1  :' WS-FS1
+               DISPLAY 'OPEN FAILED FILE1  :' WS-FS2
+               DISPLAY 'OPEN FAILED FILE2  :' WS-FS3
+               DISPLAY 'OPEN FAILED FILE3  :' WS-FS4
+               DISPLAY 'OPEN FAILED FILE4  :' WS-FS5
+           END-EVALUATE.
+
+           EXEC SQL
+             OPEN CUR1
+           END-EXEC.
+           MOVE SQLCODE TO WS-SQLCODE.
+           EVALUATE TRUE
+             WHEN SQLCODE = 0
+               DISPLAY 'CURSOR OPEN IS SUCCESS     :'
+             WHEN OTHER
+               DISPLAY 'CURSOR OPEN IS NOT SUCCESS :' WS-SQLCODE
+           PERFORM 9000-TERM-PARA
+           END-EVALUATE.
+
+       1000-OPEN-PARA-EXIT.
+           EXIT.
+
+       2000-READ-PARA.
+           READ TI001-INFILE.
+           EVALUATE TRUE
+             WHEN WS-FS1 = 0
+               DISPLAY 'READ IS SUCCESS            :'
+               MOVE TI001-INREC TO ARR-REC(WS-I)
+               DISPLAY 'ARR-REC(WS-I)   :' ARR-REC(WS-I)
+
+             ADD 1 TO WS-I
+             PERFORM 2500-FETCH2-PARA THRU
+                     2500-FETCH2-PARA-EXIT
+           WHEN WS-FS1 = 10
+           DISPLAY "EOF" WS-FS1
+           WHEN OTHER
+             DISPLAY 'READ IS UNSUCESS           :' WS-FS1
+           END-EVALUATE.
+
+       2000-READ-PARA-EXIT.
+           EXIT.
+
+       2500-FETCH2-PARA.
+           DISPLAY '*****IN FETCH PARA*****'
+           INITIALIZE DCLEMP3.
+           MOVE SPACES TO TO001-OUTREC.
+           MOVE ENAME TO HV1-ENAME
+           DISPLAY 'HV VARIABLE   :' HV1-ENAME
+           EXEC SQL
+            SELECT ENAME
+            INTO  :HV1-ENAME
+            FROM   EMP3 WHERE ENAME = :HV1-ENAME
+           END-EXEC.
+           MOVE SQLCODE TO WS-SQLCODE.
+           EVALUATE TRUE
+           WHEN SQLCODE = 0
+           DISPLAY 'FETCH2 IS SUCCESS           :'
+           MOVE HV1-ENAME TO TO001-OUTREC
+           WRITE TO001-OUTREC
+           IF WS-FS2 = 0
+           DISPLAY 'WRITE FOR 1ST FILE IS DONE :'
+           ELSE
+           DISPLAY 'WRITE FOR 1ST FILE IS ERR  :' WS-FS2
+           END-IF
+           WHEN SQLCODE = 100
+           MOVE ENAME  TO TO003-OUTREC
+           MOVE ENAME  TO TO002-OUTREC
+           DISPLAY "AFTER WRT 3  " TO003-OUTREC
+           DISPLAY "AFTER WRT 2 " TO002-OUTREC
+           WRITE TO003-OUTREC
+           WRITE TO002-OUTREC
+           IF WS-FS4= 0 AND WS-FS5 = 0
+           DISPLAY 'WRITE FOR 1ST FILE IS DONE :' WS-FS2
+           ELSE
+           DISPLAY 'WRITE FOR 1ST FILE IS ERR  :' WS-FS4
+           DISPLAY 'WRITE FOR 1ST FILE IS ERR  :' WS-FS5
+           END-IF
+           WHEN OTHER
+           DISPLAY 'FETCH IS UNSUCCESS         :' WS-SQLCODE
+           END-EVALUATE.
+
+       2500-FETCH2-PARA-EXIT.
+           EXIT.
+
+       3000-FETCH-PARA.
+           INITIALIZE DCLEMP3.
+           EXEC SQL
+            FETCH CUR1 INTO :HV1-ENAME
+           END-EXEC.
+           MOVE SQLCODE TO WS-SQLCODE.
+           EVALUATE TRUE
+           WHEN SQLCODE = 000
+           DISPLAY 'FETCH IS SUCCESS           :'
+      *    IF HV1-ENAME = ARR-REC(1) OR ARR-REC(2) OR ARR-REC(3)
+      *                               OR ARR-REC(4)
+           IF HV1-ENAME = ARR-ID(WS-I)
+           DISPLAY 'RECORDS ARE MATCHED        :'
+           ELSE
+           MOVE HV1-ENAME      TO TO002-OUTREC
+           MOVE HV1-ENAME     TO TO004-OUTREC
+           WRITE TO002-OUTREC
+           WRITE TO004-OUTREC
+           END-IF
+           WHEN SQLCODE = 100
+           MOVE 'Y' TO WS-EOF
+           WHEN OTHER
+           DISPLAY 'FETCH IS UNSUCCESS         :' WS-SQLCODE
+           END-EVALUATE.
+
+       3000-FETCH-PARA-EXIT.
+           EXIT.
+
+       4000-CLOSE-PARA.
+           CLOSE TI001-INFILE.
+           CLOSE TO001-OUTFILE.
+           CLOSE TO002-OUTFILE.
+           CLOSE TO003-OUTFILE.
+           CLOSE TO004-OUTFILE.
+           EVALUATE TRUE
+             WHEN WS-FS2 = 0
+               DISPLAY 'CLOSE IS SUCCESS FILE      :'
+             WHEN OTHER
+               DISPLAY 'CLOSE IS NOT SUCCESS FILE1 :' WS-FS1
+               DISPLAY 'CLOSE IS NOT SUCCESS FILE1 :' WS-FS2
+               DISPLAY 'CLOSE IS NOT SUCCESS FILE2 :' WS-FS3
+               DISPLAY 'CLOSE IS NOT SUCCESS FILE3 :' WS-FS4
+               DISPLAY 'CLOSE IS NOT SUCCESS FILE4 :' WS-FS5
+           END-EVALUATE.
+
+           EXEC SQL
+             CLOSE CUR1
+           END-EXEC.
+           MOVE SQLCODE TO WS-SQLCODE.
+           EVALUATE TRUE
+             WHEN SQLCODE = 0
+               DISPLAY 'CURSOR CLOSE IS SUCCESS    :'
+             WHEN OTHER
+               DISPLAY 'CURSOR CLOSE IS NOT SUCCESS:' WS-SQLCODE
+           PERFORM 9000-TERM-PARA
+           END-EVALUATE.
+
+       4000-CLOSE-PARA-EXIT.
+           EXIT.
+
+       9000-TERM-PARA.
+            STOP RUN.
+

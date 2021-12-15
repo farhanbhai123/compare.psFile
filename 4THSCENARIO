@@ -1,0 +1,446 @@
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. CA12B105.
+       ENVIRONMENT DIVISION.
+       INPUT-OUTPUT SECTION.
+       FILE-CONTROL.
+      *
+           SELECT INPS ASSIGN TO INPS
+           ORGANIZATION   IS SEQUENTIAL
+           ACCESS         IS SEQUENTIAL
+           FILE STATUS    IS WS-FS1.
+      *
+           SELECT INKS ASSIGN TO OUTPS
+           ORGANIZATION   IS INDEXED
+           ACCESS         IS SEQUENTIAL
+           RECORD KEY     IS TI002-ID
+           FILE STATUS    IS WS-FS2.
+      *
+           SELECT OUT1 ASSIGN TO DD1
+           ORGANIZATION   IS SEQUENTIAL
+           ACCESS         IS SEQUENTIAL
+           FILE STATUS    IS WS-FS3.
+      *
+           SELECT OUT2 ASSIGN TO DD2
+           ORGANIZATION   IS SEQUENTIAL
+           ACCESS         IS SEQUENTIAL
+           FILE STATUS    IS WS-FS4.
+      *
+           SELECT OUT3 ASSIGN TO DD3
+           ORGANIZATION   IS SEQUENTIAL
+           ACCESS         IS SEQUENTIAL
+           FILE STATUS    IS WS-FS5.
+      *
+           SELECT OUT4 ASSIGN TO DD4
+           ORGANIZATION   IS SEQUENTIAL
+           ACCESS         IS SEQUENTIAL
+           FILE STATUS    IS WS-FS6.
+      *
+       DATA DIVISION.
+       FILE SECTION.
+      *
+       FD INPS.
+       01 TI001-PSREC.
+         02 TI001-ID           PIC X(5).
+         02 FILLER             PIC X(75).
+      *
+       FD INKS.
+       01 TI002-KSREC.
+         02 TI002-ID           PIC X(5).
+         02 FILLER             PIC X(75).
+      **************************************
+       FD OUT1.
+       01 TO001-OUTREC.
+         02 TO001-ID           PIC X(5).
+         02 FILLER             PIC X(75).
+      *
+       FD OUT2.
+       01 TO002-OUTREC.
+         02 TO002-ID           PIC X(5).
+         02 FILLER             PIC X(75).
+      *
+       FD OUT3.
+       01 TO003-OUTREC.
+         02 TO003-ID           PIC X(5).
+         02 FILLER             PIC X(75).
+      *
+       FD OUT4.
+       01 TO004-OUTREC.
+         02 TO004-ID           PIC X(5).
+         02 FILLER             PIC X(75).
+      *
+       WORKING-STORAGE SECTION.
+
+
+           EXEC SQL
+             INCLUDE SQLCA
+           END-EXEC.
+      *
+           EXEC SQL
+             INCLUDE DCLGEN1
+           END-EXEC.
+      *
+           EXEC SQL
+             INCLUDE DCLGEN2
+           END-EXEC.
+      *
+      ******* DB TO DB SQL ********
+           EXEC SQL
+             INCLUDE SQL1
+           END-EXEC.
+      *****************************
+      *
+       01 WS-FS1               PIC 9(2).
+         88 F1-SUCC             VALUE 00.
+         88 F1-EOF              VALUE 10.
+         88 F1-FNF              VALUE 35.
+      *
+       01 WS-FS2               PIC 9(2).
+         88 F2-SUCC             VALUE 00.
+         88 F2-EOF              VALUE 10.
+         88 F2-FNF              VALUE 35.
+      *
+       01 WS-FS3               PIC 9(2).
+         88 F3-SUCC             VALUE 00.
+       01 WS-FS4               PIC 9(2).
+         88 F4-SUCC             VALUE 00.
+       01 WS-FS5               PIC 9(2).
+         88 F5-SUCC             VALUE 00.
+       01 WS-FS6               PIC 9(2).
+         88 F6-SUCC             VALUE 00.
+      *
+       01 WS-SQLCODE           PIC S9(3) SIGN LEADING SEPARATE.
+      *
+       PROCEDURE DIVISION.
+       0000-MAIN-PARA.
+           PERFORM 1000-INTIAL-PARA THRU
+                   1000-INTIAL-PARA-EXIT
+           PERFORM 2000-PROCESS-PARA THRU
+                   2000-PROCESS-PARA-EXIT
+           PERFORM 9000-TERM-PARA THRU
+                   9000-TERM-PARA-EXIT.
+       0000-MAIN-PARA-EXIT.
+           EXIT.
+      *
+       1000-INTIAL-PARA.
+           INITIALIZE WS-FS1 WS-FS2 WS-FS3 WS-FS4
+                      WS-FS5 WS-FS6.
+       1000-INTIAL-PARA-EXIT.
+           EXIT.
+      *
+       2000-PROCESS-PARA.
+           PERFORM 3000-OPEN-PARA THRU
+                   3000-OPEN-PARA-EXIT
+           PERFORM 4000-FIND-PARA THRU
+                   4000-FIND-PARA-EXIT
+           PERFORM 5000-CLOSE-PARA THRU
+                   5000-CLOSE-PARA-EXIT.
+       2000-PROCESS-PARA-EXIT.
+           EXIT.
+      *
+       3000-OPEN-PARA.
+      *
+           OPEN INPUT INPS
+           OPEN INPUT INKS
+
+           EVALUATE TRUE
+           WHEN F1-SUCC
+             DISPLAY 'PS OPEN'
+           WHEN F2-SUCC
+             DISPLAY 'KS OPEN'
+           WHEN F1-FNF OR F1-FNF
+             DISPLAY 'FNF'
+           WHEN OTHER
+             DISPLAY 'PS,KS FL ' WS-FS1 ' ' WS-FS2
+             STOP RUN
+           END-EVALUATE.
+      *
+           OPEN OUTPUT OUT1 OUT2 OUT3 OUT4
+           EVALUATE TRUE
+           WHEN F3-SUCC AND F4-SUCC AND
+                F5-SUCC AND F6-SUCC
+              DISPLAY 'OUTFILE ALL OP'
+           WHEN OTHER
+              DISPLAY 'OUTFILE NOT OP ' WS-FS3 ' '
+                                        WS-FS4 ' '
+                                        WS-FS5 ' '
+                                        WS-FS6 ' '
+           END-EVALUATE.
+
+       3000-OPEN-PARA-EXIT.
+           EXIT.
+      *
+       4000-FIND-PARA.
+
+           EVALUATE TRUE
+           WHEN F1-FNF AND F2-FNF
+             DISPLAY 'DATABASE'
+
+             PERFORM 4100-DBTODB-PARA THRU
+                     4100-DBTODB-PARA-EXIT
+
+           WHEN F1-SUCC AND F2-FNF
+             DISPLAY 'F1,DB'
+           WHEN F1-FNF AND F2-SUCC
+             DISPLAY 'F2,DB'
+           WHEN F1-SUCC AND F2-SUCC
+             DISPLAY 'NOT THIS CODE'
+           WHEN OTHER
+             DISPLAY 'HELP' WS-FS1 ' ' WS-FS2
+             STOP RUN
+           END-EVALUATE.
+
+       4000-FIND-PARA-EXIT.
+           EXIT.
+      *
+       4100-DBTODB-PARA.
+
+           EXEC SQL
+              OPEN CR1
+           END-EXEC.
+
+           EVALUATE TRUE
+           WHEN SQLCODE = 0
+             PERFORM 6110-FETCH1-PARA THRU
+                     6110-FETCH1-PARA-EXIT UNTIL SQLCODE = 100
+           WHEN OTHER
+             MOVE SQLCODE TO WS-SQLCODE
+             DISPLAY 'CR1 ERR ' WS-SQLCODE
+             STOP RUN
+           END-EVALUATE.
+      *
+           EXEC SQL
+              OPEN CR2
+           END-EXEC.
+           EVALUATE TRUE
+           WHEN SQLCODE = 0
+             PERFORM 6110-FETCH2-PARA THRU
+                     6110-FETCH2-PARA-EXIT UNTIL SQLCODE = 100
+             DISPLAY 'END'
+           WHEN OTHER
+             MOVE SQLCODE TO WS-SQLCODE
+             DISPLAY 'CR2 ERR ' WS-SQLCODE
+           END-EVALUATE.
+      *
+           EXEC SQL
+              OPEN CR3
+           END-EXEC.
+           EVALUATE TRUE
+           WHEN SQLCODE = 0
+             PERFORM 6110-FETCH3-PARA THRU
+                     6110-FETCH3-PARA-EXIT UNTIL SQLCODE = 100
+           WHEN OTHER
+             MOVE SQLCODE TO WS-SQLCODE
+             DISPLAY 'CR3 ERR ' WS-SQLCODE
+           END-EVALUATE.
+
+      *
+           EXEC SQL
+              OPEN CR4
+           END-EXEC.
+
+           EVALUATE TRUE
+           WHEN SQLCODE = 0
+             PERFORM 6110-FETCH4-PARA THRU
+                     6110-FETCH4-PARA-EXIT UNTIL SQLCODE = 100
+           WHEN OTHER
+             MOVE SQLCODE TO WS-SQLCODE
+             DISPLAY 'CR4 ERR ' WS-SQLCODE
+           END-EVALUATE.
+
+       4100-DBTODB-PARA-EXIT.
+           EXIT.
+      ******************************
+       6110-FETCH1-PARA.
+
+           EXEC SQL
+              FETCH CR1 INTO :HV1-ID
+           END-EXEC.
+           EVALUATE TRUE
+           WHEN SQLCODE = 0
+              MOVE HV1-ID-TEXT TO TO001-ID
+              MOVE HV1-NAME-TEXT TO TO001-ALL
+              PERFORM 1111-WRT-PARA THRU
+                      1111-WRT-PARA-EXIT
+           WHEN SQLCODE = 100
+             DISPLAY 'END'
+           WHEN OTHER
+             MOVE SQLCODE TO WS-SQLCODE
+             DISPLAY 'FETC1 OUT ' WS-SQLCODE
+             STOP RUN
+           END-EVALUATE.
+
+       6110-FETCH1-PARA-EXIT.
+           EXIT.
+
+       6110-FETCH2-PARA.
+           EXEC SQL
+              FETCH CR2 INTO :HV1-ID
+           END-EXEC.
+           EVALUATE TRUE
+           WHEN SQLCODE = 0
+              MOVE HV1-ID-TEXT TO TO002-ID
+              MOVE HV1-NAME-TEXT TO TO002-ALL
+              PERFORM 2222-WRT-PARA THRU
+                      2222-WRT-PARA-EXIT
+           WHEN SQLCODE = 100
+             DISPLAY 'END'
+           WHEN OTHER
+             MOVE SQLCODE TO WS-SQLCODE
+             DISPLAY 'FETC2 OUT ' WS-SQLCODE
+             STOP RUN
+           END-EVALUATE.
+
+       6110-FETCH2-PARA-EXIT.
+           EXIT.
+
+       6110-FETCH3-PARA.
+           EXEC SQL
+              FETCH CR3 INTO :HV2-ID
+           END-EXEC.
+           EVALUATE TRUE
+           WHEN SQLCODE = 0
+              MOVE HV2-ID-TEXT TO TO003-ID
+              MOVE HV2-NAME-TEXT TO TO003-ALL
+              PERFORM 3333-WRT-PARA THRU
+                      3333-WRT-PARA-EXIT
+           WHEN SQLCODE = 100
+             DISPLAY 'END'
+           WHEN OTHER
+             MOVE SQLCODE TO WS-SQLCODE
+             DISPLAY 'FETC3 OUT ' WS-SQLCODE
+             STOP RUN
+           END-EVALUATE.
+
+       6110-FETCH3-PARA-EXIT.
+           EXIT.
+
+       6110-FETCH4-PARA.
+           EXEC SQL
+                             :HV1-ID
+           END-EXEC.
+           EVALUATE TRUE
+           WHEN SQLCODE = 0
+              MOVE HV1-ID-TEXT TO TO004-ID
+              MOVE HV1-NAME-TEXT TO TO004-ALL
+              PERFORM 4444-WRT-PARA THRU
+                      4444-WRT-PARA-EXIT
+           WHEN SQLCODE = 100
+             DISPLAY 'END'
+           WHEN OTHER
+             MOVE SQLCODE TO WS-SQLCODE
+             DISPLAY 'FETC4 OUT ' WS-SQLCODE
+             STOP RUN
+           END-EVALUATE.
+
+       6110-FETCH4-PARA-EXIT.
+           EXIT.
+      ******************************
+       1111-WRT-PARA.
+
+           WRITE TO001-OUTREC.
+           EVALUATE TRUE
+           WHEN F3-SUCC
+             DISPLAY 'WRT 1 SUCC'
+             DISPLAY TO001-OUTREC
+           WHEN OTHER
+             DISPLAY 'WRT 1 FIL ' WS-FS3
+           END-EVALUATE.
+
+       1111-WRT-PARA-EXIT.
+           EXIT.
+      *
+       2222-WRT-PARA.
+
+           WRITE TO002-OUTREC.
+           EVALUATE TRUE
+           WHEN F4-SUCC
+             DISPLAY 'WRT 2 SUCC'
+             DISPLAY TO002-OUTREC
+           WHEN OTHER
+             DISPLAY 'WRT 2 FIL ' WS-FS4
+           END-EVALUATE.
+
+       2222-WRT-PARA-EXIT.
+           EXIT.
+      *
+       3333-WRT-PARA.
+
+           WRITE TO003-OUTREC.
+           EVALUATE TRUE
+           WHEN F5-SUCC
+             DISPLAY 'WRT 3 SUCC'
+             DISPLAY TO003-OUTREC
+           WHEN OTHER
+             DISPLAY 'WRT 3 FIL ' WS-FS5
+           END-EVALUATE.
+
+       3333-WRT-PARA-EXIT.
+           EXIT.
+      *
+       4444-WRT-PARA.
+
+           WRITE TO004-OUTREC.
+           EVALUATE TRUE
+           WHEN F5-SUCC
+             DISPLAY 'WRT 4 SUCC'
+             DISPLAY TO004-OUTREC
+           WHEN OTHER
+             DISPLAY 'WRT 4 FIL ' WS-FS6
+           END-EVALUATE.
+
+       4444-WRT-PARA-EXIT.
+           EXIT.
+
+       5000-CLOSE-PARA.
+           EVALUATE TRUE
+           WHEN  WS-FS1 NOT = 35
+
+             CLOSE INPS
+             EVALUATE TRUE
+             WHEN F1-SUCC
+               DISPLAY 'PS CLOSE'
+             WHEN OTHER
+               DISPLAY 'PS CLOSE F ' WS-FS1
+               STOP RUN
+             END-EVALUATE
+
+           WHEN WS-FS2 NOT = 35
+
+             CLOSE INKS
+             EVALUATE TRUE
+             WHEN F2-SUCC
+               DISPLAY 'KS CLOSE'
+             WHEN OTHER
+               DISPLAY 'KS CLOSE F ' WS-FS2
+               STOP RUN
+             END-EVALUATE
+
+           WHEN OTHER
+             DISPLAY 'TWO FILE NOT OPEN'
+           END-EVALUATE.
+
+           EXEC SQL
+             CLOSE CR1
+           END-EXEC.
+
+           EXEC SQL
+             CLOSE CR2
+           END-EXEC.
+
+           EXEC SQL
+             CLOSE CR3
+           END-EXEC.
+
+           EXEC SQL
+             CLOSE CR4
+           END-EXEC.
+       5000-CLOSE-PARA-EXIT.
+           EXIT.
+
+       9000-TERM-PARA.
+           STOP RUN.
+
+       9000-TERM-PARA-EXIT.
+           EXIT.
+      *
+

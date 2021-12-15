@@ -1,0 +1,290 @@
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. CB12J105.
+       ENVIRONMENT DIVISION.
+       INPUT-OUTPUT SECTION.
+       FILE-CONTROL.
+           SELECT TO001-OUTFILE ASSIGN TO DD1
+           ORGANIZATION              IS SEQUENTIAL
+           ACCESS MODE               IS SEQUENTIAL
+           FILE STATUS               IS WS-FS1.
+           SELECT TO002-OUTFILE ASSIGN TO DD2
+           ORGANIZATION              IS SEQUENTIAL
+           ACCESS MODE               IS SEQUENTIAL
+           FILE STATUS               IS WS-FS2.
+           SELECT TO003-OUTFILE ASSIGN TO DD3
+           ORGANIZATION              IS SEQUENTIAL
+           ACCESS MODE               IS SEQUENTIAL
+           FILE STATUS               IS WS-FS3.
+           SELECT TO004-OUTFILE ASSIGN TO DD4
+           ORGANIZATION              IS SEQUENTIAL
+           ACCESS MODE               IS SEQUENTIAL
+           FILE STATUS               IS WS-FS4.
+       DATA DIVISION.
+       FILE SECTION.
+       FD TO001-OUTFILE.
+       01 TO001-OUTREC.
+         02 TO001-EID                PIC X(1).
+         02 FILLER                  PIC X(79).
+       FD TO002-OUTFILE.
+       01 TO002-OUTREC.
+         02 TO002-EID                PIC X(1).
+         02 FILLER                  PIC X(79).
+       FD TO003-OUTFILE.
+       01 TO003-OUTREC.
+         02 TO003-EID                PIC X(1).
+         02 FILLER                  PIC X(79).
+       FD TO004-OUTFILE.
+       01 TO004-OUTREC.
+         02 TO004-EID                PIC X(1).
+         02 FILLER                  PIC X(79).
+       WORKING-STORAGE SECTION.
+       01 WS-FS1                  PIC 9(2).
+       01 WS-FS2                  PIC 9(2).
+       01 WS-FS3                  PIC 9(2).
+       01 WS-FS4                  PIC 9(2).
+       01 WS-SQLCODE       PIC S9(3) SIGN LEADING SEPARATE.
+       01 NO-MORE-ROWS      PIC X(1).
+       01 ERR-MSG.
+         02 ERR-LEN      PIC S9(4) COMP VALUE 800.
+         02 ERR-CONT     PIC X(80) OCCURS 10 TIMES.
+       01 ERR-LRECL      PIC S9(9) COMP VALUE 80.
+           EXEC SQL
+            INCLUDE SQLCA
+           END-EXEC.
+           EXEC SQL
+            INCLUDE DB12J105
+           END-EXEC.
+           EXEC SQL
+            INCLUDE DB22J105
+           END-EXEC.
+
+           EXEC SQL
+            DECLARE CUR1 CURSOR FOR
+             SELECT  A.EID
+                    ,B.EID
+             FROM
+                  EMP1 A INNER JOIN EMP2 B
+                  ON A.EID = B.EID
+           END-EXEC.
+
+           EXEC SQL
+            DECLARE CUR2 CURSOR FOR
+                SELECT * FROM EMP2
+                WHERE EID NOT IN(SELECT EID FROM  EMP1)
+           END-EXEC.
+
+           EXEC SQL
+            DECLARE CUR3 CURSOR FOR
+                SELECT * FROM EMP1
+                WHERE EID NOT IN(SELECT EID FROM  EMP2)
+           END-EXEC.
+
+       PROCEDURE DIVISION.
+
+       0000-MAIN-PARA.
+           PERFORM 1000-OPEN-PARA THRU
+                   1000-OPEN-PARA-EXIT
+           PERFORM 2000-FETCH-PARA THRU
+                   2000-FETCH-PARA-EXIT UNTIL NO-MORE-ROWS = 'Y'.
+           MOVE 'N' TO NO-MORE-ROWS
+           PERFORM 2100-FETCH-PARA THRU
+                   2100-FETCH-PARA-EXIT UNTIL NO-MORE-ROWS = 'Y'.
+           MOVE 'N' TO NO-MORE-ROWS
+           PERFORM 2200-FETCH-PARA THRU
+                   2200-FETCH-PARA-EXIT UNTIL NO-MORE-ROWS = 'Y'.
+           MOVE 'N' TO NO-MORE-ROWS
+           PERFORM 4000-CLOSE-PARA THRU
+                   4000-CLOSE-PARA-EXIT
+           PERFORM 9000-TERM-PARA THRU
+                   9000-TERM-PARA-EXIT.
+       0000-MAIN-PARA-EXIT.
+           EXIT.
+       1000-OPEN-PARA.
+           OPEN OUTPUT TO001-OUTFILE.
+           OPEN OUTPUT TO002-OUTFILE.
+           OPEN OUTPUT TO003-OUTFILE.
+           OPEN OUTPUT TO004-OUTFILE.
+           EVALUATE TRUE
+           WHEN WS-FS1 = 0 AND WS-FS2 = 0 AND WS-FS3 = 0
+                         AND WS-FS4 = 0
+             DISPLAY 'OPEN SUCCESS'
+           WHEN OTHER
+             DISPLAY 'OPEN FAIL' WS-FS1
+             DISPLAY 'OPEN FAIL' WS-FS2
+             DISPLAY 'OPEN FAIL' WS-FS3
+             DISPLAY 'OPEN FAIL' WS-FS4
+           END-EVALUATE
+           EXEC SQL
+               OPEN CUR1
+           END-EXEC.
+           EXEC SQL
+               OPEN CUR2
+           END-EXEC.
+           EVALUATE TRUE
+            WHEN SQLCODE = 0
+              DISPLAY "OPEN CUR SUCCESS"
+            WHEN OTHER
+             MOVE SQLCODE TO WS-SQLCODE
+                 DISPLAY "OPEN FAILS " WS-SQLCODE
+                 CALL 'DSNTIAR' USING SQLCA,ERR-MSG,ERR-LRECL
+                 DISPLAY ERR-MSG
+                 STOP RUN
+           END-EVALUATE.
+           EXEC SQL
+               OPEN CUR3
+           END-EXEC.
+           EVALUATE TRUE
+            WHEN SQLCODE = 0
+              DISPLAY "OPEN CUR SUCCESS"
+            WHEN OTHER
+             MOVE SQLCODE TO WS-SQLCODE
+                 DISPLAY "OPEN FAILS " WS-SQLCODE
+                 CALL 'DSNTIAR' USING SQLCA,ERR-MSG,ERR-LRECL
+                 DISPLAY ERR-MSG
+                 STOP RUN
+           END-EVALUATE.
+
+       1000-OPEN-PARA-EXIT.
+           EXIT.
+
+       2000-FETCH-PARA.
+           DISPLAY ' IN 1 FETCH'
+           INITIALIZE DCLEMP1 DCLEMP2.
+           MOVE SPACES TO TO001-OUTREC
+           EXEC SQL
+             FETCH CUR1 INTO :HV1-EID,
+                             :HV2-EID
+           END-EXEC.
+            IF SQLCODE = 0
+                DISPLAY "REC FETCH SUC"
+                  PERFORM 4100-COND1-PARA THRU
+                          4100-COND1-PARA-EXIT
+            ELSE IF SQLCODE = 100
+                DISPLAY "END REC"
+           MOVE 'Y' TO NO-MORE-ROWS
+           ELSE
+             MOVE SQLCODE TO WS-SQLCODE
+                 DISPLAY "SELECT FAILS " WS-SQLCODE
+                 CALL 'DSNTIAR' USING SQLCA,ERR-MSG,ERR-LRECL
+                 DISPLAY ERR-MSG
+                 STOP RUN
+           END-IF
+           END-IF.
+       2000-FETCH-PARA-EXIT.
+           EXIT.
+      *****
+       2100-FETCH-PARA.
+           DISPLAY 'IN 2 FETCH'
+           INITIALIZE DCLEMP2.
+           MOVE SPACES TO TO002-OUTREC
+           MOVE SPACES TO TO004-OUTREC
+           EXEC SQL
+             FETCH CUR2 INTO :HV2-EID
+           END-EXEC.
+           EVALUATE TRUE
+            WHEN SQLCODE = 0
+                DISPLAY "REC FETCH SUC"
+                  PERFORM 4200-COND2-PARA THRU
+                          4200-COND2-PARA-EXIT
+            WHEN SQLCODE = 100
+                DISPLAY "END REC"
+                 MOVE 'Y' TO NO-MORE-ROWS
+            WHEN OTHER
+             MOVE SQLCODE TO WS-SQLCODE
+                 DISPLAY "SELECT FAILS " WS-SQLCODE
+                 CALL 'DSNTIAR' USING SQLCA,ERR-MSG,ERR-LRECL
+                 DISPLAY ERR-MSG
+                 STOP RUN
+           END-EVALUATE.
+       2100-FETCH-PARA-EXIT.
+           EXIT.
+      *****
+       2200-FETCH-PARA.
+           DISPLAY ' IN 3 FETCH'
+           INITIALIZE DCLEMP1.
+           MOVE SPACES TO TO003-OUTREC
+           MOVE SPACES TO TO004-OUTREC
+           EXEC SQL
+             FETCH CUR3 INTO :HV1-EID
+           END-EXEC.
+           EVALUATE TRUE
+            WHEN SQLCODE = 0
+                DISPLAY "REC OPEN SUC"
+                  PERFORM 4300-COND3-PARA THRU
+                          4300-COND3-PARA-EXIT
+            WHEN SQLCODE = 100
+                DISPLAY "END REC"
+                 MOVE 'Y' TO NO-MORE-ROWS
+            WHEN OTHER
+             MOVE SQLCODE TO WS-SQLCODE
+                 DISPLAY "SELECT FAILS " WS-SQLCODE
+                 CALL 'DSNTIAR' USING SQLCA,ERR-MSG,ERR-LRECL
+                 DISPLAY ERR-MSG
+                 STOP RUN
+           END-EVALUATE.
+       2200-FETCH-PARA-EXIT.
+           EXIT.
+       4100-COND1-PARA.
+           DISPLAY ' IN 1 CMPR'
+             MOVE HV1-EID TO TO001-EID
+             MOVE HV2-EID TO TO001-EID
+             WRITE TO001-OUTREC
+              IF WS-FS1 = 0
+                DISPLAY 'WRITE SUCCESS'
+              ELSE
+                DISPLAY 'WRITE FAIL'
+              END-IF.
+       4100-COND1-PARA-EXIT.
+           EXIT.
+
+       4200-COND2-PARA.
+           DISPLAY ' IN 2 CMPR'
+             MOVE HV2-EID TO TO002-EID
+             MOVE HV2-EID TO TO004-EID
+             WRITE TO002-OUTREC
+             WRITE TO004-OUTREC
+              IF WS-FS2 = 0 AND WS-FS4 = 0
+                DISPLAY 'WRITE 2 AND 4 SUCCESS'
+              ELSE
+                DISPLAY 'WRITE FAIL' WS-FS2
+                DISPLAY 'WRITE ERROR'WS-FS4
+              END-IF.
+
+       4200-COND2-PARA-EXIT.
+           EXIT.
+
+       4300-COND3-PARA.
+           DISPLAY ' IN 3 CMPR'
+             MOVE HV1-EID TO TO003-EID
+             MOVE HV1-EID TO TO004-EID
+             WRITE TO003-OUTREC
+             WRITE TO004-OUTREC
+              IF WS-FS3 = 0 AND WS-FS4 = 0
+                DISPLAY 'WRITE 3 AND 4 '
+              ELSE
+                DISPLAY 'WRITE ERROR'
+              END-IF.
+
+       4300-COND3-PARA-EXIT.
+           EXIT.
+       4000-CLOSE-PARA.
+           CLOSE TO001-OUTFILE.
+           CLOSE TO002-OUTFILE.
+           CLOSE TO003-OUTFILE.
+           CLOSE TO004-OUTFILE.
+           EXEC SQL
+              CLOSE CUR1
+           END-EXEC.
+           EXEC SQL
+              CLOSE CUR2
+           END-EXEC.
+           EXEC SQL
+              CLOSE CUR3
+           END-EXEC.
+       4000-CLOSE-PARA-EXIT.
+           EXIT.
+       9000-TERM-PARA.
+           STOP RUN.
+       9000-TERM-PARA-EXIT.
+           EXIT.
+
